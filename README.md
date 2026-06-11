@@ -292,26 +292,131 @@ Zeppelin 段落之间可以共享 SparkContext 和 SparkSession，因此前段�
 
 - Task 1: Calculating Average Rating for Each Movie
 
+ ```bash
+# 任务i: 每部电影的平均评分
+    movie_average_ratings_df = spark.sql(
+        """
+        SELECT
+            m.movie_id,
+            m.movie_title,
+            ROUND(AVG(r.rating), 3) AS average_rating,
+            COUNT(*) AS rating_count
+        FROM ratings r
+        JOIN movies m
+            ON r.movie_id = m.movie_id
+        GROUP BY m.movie_id, m.movie_title
+        ORDER BY m.movie_id
+        """
+    )
+  ```
+
 使用 Spark DataFrame API 按 movie_id 分组，计算平均评分。将计算结果与 movies_df 关联，获取电影标题等额外信息。最终将结果写入 Cassandra 表 movie_average_ratings。
 
 - Task 2: Identifying Top Ten Movies by Average Rating
+
+ ```bash
+  # 任务ii: 平均评分最高的十部电影
+    top_ten_movies_df = spark.sql(
+        """
+        SELECT
+            m.movie_id,
+            m.movie_title,
+            ROUND(AVG(r.rating), 3) AS average_rating,
+            COUNT(*) AS rating_count
+        FROM ratings r
+        JOIN movies m
+            ON r.movie_id = m.movie_id
+        GROUP BY m.movie_id, m.movie_title
+        ORDER BY average_rating DESC, rating_count DESC, movie_title ASC
+        LIMIT 10
+        """
+    )
+  ```
 
 在任务 1 结果的基础上进行排序，使用 orderBy(col("average_rating").desc()) 降序排列，然后 limit(10) 选取前十部，写入 Cassandra 表 	op_ten_movies。
 
 - Task 3: Identifying Active Users' Favourite Genre
 
-对于评分数量达到 50 部及以上的活跃用户，将电影类型列从宽表转换为长表（使用 explode 和 rray 函数）。计算每个用户在每个类型上的评分数量，最后使用 
-ow_number() 窗口函数选出每个用户评分最多的类型作为最爱类型。结果写入 Cassandra 表 avourite_genres。
+  ```bash
+    # 任务iii: 评分至少50部电影的活跃用户及其最喜爱的类型
+    active_users_df = (
+        ratings_df.groupBy("user_id")
+        .agg(count("*").alias("rated_movie_count"))
+        .filter(col("rated_movie_count") >= 50)
+    )
+
+    user_genre_counts_df = (
+        ratings_df.join(movie_genres_df, "movie_id")
+        .join(active_users_df, "user_id")
+        .groupBy("user_id", "genre", "rated_movie_count")
+        .agg(count("*").alias("genre_rating_count"))
+    )
+
+    genre_rank_window = Window.partitionBy("user_id").orderBy(
+        col("genre_rating_count").desc(), col("genre").asc()
+    )
+
+    favourite_genres_df = (
+        user_genre_counts_df.withColumn("genre_rank", row_number().over(genre_rank_window))
+        .filter(col("genre_rank") == 1)
+        .join(users_df, "user_id")
+        .select(
+            "user_id",
+            "age",
+            "gender",
+            "occupation",
+            "rated_movie_count",
+            col("genre").alias("favourite_genre"),
+            "genre_rating_count",
+        )
+        .orderBy("user_id")
+    )
+  ```
+
+对于评分数量达到 50 部及以上的活跃用户，将电影类型列从宽表转换为长表（使用 explode 和 array 函数）。计算每个用户在每个类型上的评分数量，最后使用 
+ow_number() 窗口函数选出每个用户评分最多的类型作为最爱类型。
 
 - Task 4 and Task 5: Filtering Users by Age and Occupation
 
-任务 4 和 5 是两个条件过滤任务。
-任务 4 筛选年龄小于 20 岁的用户，写入 users_under_20。
-任务 5 筛选职业为 scientist 且年龄在 30 到 40 岁之间的用户，写入 scientists_30_to_40。
+ ```bash
+   # 任务iv: 20岁以下的用户
+    users_under_20_df = spark.sql(
+        """
+        SELECT user_id, age, gender, occupation, zip_code
+        FROM users
+        WHERE age < 20
+        ORDER BY age ASC, user_id ASC
+        """
+    )
+
+    # 任务v: 30-40岁之间的科学家用户
+    scientists_30_to_40_df = spark.sql(
+        """
+        SELECT user_id, age, gender, occupation, zip_code
+        FROM users
+        WHERE occupation = 'scientist'
+          AND age BETWEEN 30 AND 40
+        ORDER BY age ASC, user_id ASC
+        """
+    )
+  ```
+
+任务 4 和 5 是两个条件过滤任务。任务 4 筛选年龄小于 20 岁的用户，写入 users_under_20。任务 5 筛选职业为 scientist 且年龄在 30 到 40 岁之间的用户，写入 scientists_30_to_40。
 
 ## 4.4 写入Cassandra
 
+ ```bash
+    write_to_cassandra(users_df, "users")
+    write_to_cassandra(ratings_df, "ratings")
+    write_to_cassandra(movies_df.select("movie_id", "movie_title", "release_date", "imdb_url"), "movies")
+    write_to_cassandra(movie_average_ratings_df, "movie_average_ratings")
+    write_to_cassandra(top_ten_movies_df, "top_ten_movies")
+    write_to_cassandra(favourite_genres_df, "favourite_genres")
+    write_to_cassandra(users_under_20_df, "users_under_20")
+    write_to_cassandra(scientists_30_to_40_df, "scientists_30_to_40")
+  ```
 
+- 将上述4.3和4.4的核心代码封装在main()函数中，可以一次性完整运行一次 MovieLens 数据分析任务，对外只暴露 main() 这一个调用入口，不需要传入任何参数，非常简洁。
 
 ## 4.5 Results Analysis
 
@@ -380,10 +485,18 @@ SELECT * FROM movielens_ks.scientists_30_to_40 LIMIT 10;
 
 截图中的字段（movie_id、average_rating、movie_title、rating_count、user_id、age、occupation、avourite_genre 等）与 Spark 输出一致，证明结果已正确写入 Cassandra。
 
+# 6. Zeppelin Notebook
 
-# 6. Project Challenges
+另一种代码逻辑，核心是每个单元格的%spark2.pyspark载入，其他代码跟movielens_spark_cassandra_pipeline.py文件中的主体代码是类似的，运行环境从puTTY终端转移到了zeppelin notebook上，我把代码按照单元格分别依次运行，保存为json文件，在该项目的Assignment02json文件中，可以直接导入zeppelin中运行，注意手动配置jars。部分结果截图：
 
-## 6.1 Spark 与 Cassandra 连接器版本兼容性问题
+<div align="center">
+    <img src="Zeppelin%20screenshot/12_Verify%20Result1.png">
+    <img src="Zeppelin%20screenshot/13_Verify%20Result2.png">
+</div>
+
+# 7. Project Challenges
+
+## 7.1 Spark 与 Cassandra 连接器版本兼容性问题
 
 本项目的第一个主要挑战是 Apache Spark 与 Spark Cassandra Connector 之间的版本兼容性。
 
@@ -409,18 +522,18 @@ Value: com.datastax.spark:spark-cassandra-connector_2.11:2.4.3
 
 配置完成后点击save保存，依次操作：Interpreter → spark2 → Restart 重启Spark2解释器
 
-## 6.2 电影类型数据结构处理
+## 7.2 电影类型数据结构处理
 
 第二个挑战是 u.item 文件中电影类型的存储结构。19 种电影类型以独立的列存储（每列 0 或 1），这种宽表格式不利于统计用户在各类型上的评分数量。
 
 **解决方案**：使用 Spark 的 rray 和 explode 函数，将宽表转为长表后再与评分数据做关联计算，从而正确统计每个用户在每个类型上的评分数量，并找出最爱类型。
 
 
-## 6.3 Cassandra 查询结果排序问题
+## 7.3 Cassandra 查询结果排序问题
 
 最后一个挑战是 Cassandra 查询结果的排序。Cassandra 是分布式数据库，SELECT 查询返回的结果不一定按照 Spark 输出的顺序排列。因此，在 cqlsh 中使用 LIMIT 10 主要用于验证数据存在性和表结构字段的正确性。对于基于排序的分析结果，以 Spark 的输出为准更合适。
 
-## 9. Conclusion
+## 8. Conclusion
 
 本项目成功使用 Spark 和 Cassandra 实现了完整的 MovieLens 100K 数据分析管道。原始数据从 HDFS 加载，经 RDD 解析后转为 DataFrame，完成清洗、分析和 Cassandra 写入。本次项目涵盖了 HDFS 数据加载、RDD 创建、DataFrame 转换、Spark SQL 分析、Cassandra 写入和结果验证的完整数据处理工作流。
 
