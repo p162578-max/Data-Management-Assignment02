@@ -4,9 +4,9 @@
 
 This project builds a data processing and analytics pipeline using the MovieLens 100K dataset with Python, Apache Spark, HDFS, and Cassandra. The main dataset files used in this project are:
 
-- u.user: user information, including user ID, age, gender, occupation, and ZIP code.
-- u.data: rating information, including user ID, movie ID, rating, and timestamp.
-- u.item: movie information, including movie ID, movie title, release date, IMDb URL, and genre indicators.
+- `u.user`: user information, including user ID, age, gender, occupation, and ZIP code.
+- `u.data`: rating information, including user ID, movie ID, rating, and timestamp.
+- `.item`: movie information, including movie ID, movie title, release date, IMDb URL, and genre indicators.
 
 The objective of this project is to read raw MovieLens data from HDFS into Spark, create RDDs, convert them into DataFrames, perform cleaning and analytical queries, and write the results into Cassandra tables. The final results are then verified in cqlsh by selecting records from the Cassandra tables.
 
@@ -41,15 +41,15 @@ The recommended environment is:
 
 A key compatibility issue in this project is the Spark Cassandra Connector version. Since Spark 2.3.0 belongs to the Scala 2.11 ecosystem, newer connector versions may not work correctly. Therefore, the connector package was specified in the spark-submit command:
 
-`ash
+```bash
 spark-submit --packages com.datastax.spark:spark-cassandra-connector_2.11:2.5.2 assignment2.py
-`
+```
 
 At the same time, the following configuration was not repeated inside the Python code:
 
-`python
+```bash
 .config("spark.jars.packages", "...")
-`
+```
 
 In other words, this line was commented out or removed from build_spark_session() to avoid dependency conflicts or repeated connector configuration.
 
@@ -64,13 +64,14 @@ Before running Spark tasks, it is necessary to ensure that the Cassandra databas
 1. Connect to the virtual machine via PuTTY and activate the Cassandra service in the terminal.
 2. Use the following commands to check the Cassandra activation status
 
-`ash
+```bash
 # Start the Cassandra service
 sudo service cassandra start
 
 # Check the Cassandra service running status
 service cassandra status
-`
+```
+
 <div align="center">
     <img src="Putty%20screenshot/00_CassandraActivation%26StatusCheck.png">
 </div>
@@ -79,7 +80,7 @@ service cassandra status
 
 After Cassandra is running normally, enter the cqlsh command line interface and execute the following CQL script to create the keyspace and all required tables:
 
-`ash
+```bash
 CREATE KEYSPACE IF NOT EXISTS movielens_ks
 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
 
@@ -156,7 +157,7 @@ TRUNCATE top_ten_movies;
 TRUNCATE favourite_genres;
 TRUNCATE users_under_20;
 TRUNCATE scientists_30_to_40;
-`
+```
 
 This script created:
 - Three raw data tables: users, ratings, movies (used to store the raw data loaded from HDFS).
@@ -173,9 +174,9 @@ Next, I connected to the virtual machine using PuTTY, activated Cassandra, and e
 
 After creating the keyspace, I executed the CQL script in cqlsh to create all required tables. Then, I created a Python file (e.g., assignment2.py) in PuTTY and wrote the PySpark code into it. After completing the script, I submitted it using spark-submit:
 
-`ash
+```bash
 spark-submit --packages com.datastax.spark:spark-cassandra-connector_2.11:2.5.2 assignment2.py
-`
+```
 
 After the program ran successfully, Spark completed the five analytical tasks and wrote the result DataFrames to Cassandra. Finally, I used cqlsh to verify whether the data was written correctly.
 
@@ -206,12 +207,12 @@ The code first imports the required PySpark modules, including SparkSession, SQL
 
 The build_spark_session() function is used to create a SparkSession and configure the Cassandra host:
 
-`python
+```bash
 SparkSession.builder \
     .appName(APP_NAME) \
     .config("spark.cassandra.connection.host", CASSANDRA_HOST) \
     .getOrCreate()
-`
+```
 
 In this project, spark.jars.packages was not configured in the code. Instead, the Cassandra connector was specified in the spark-submit command. This approach is more stable for Spark 2.3.0 as it avoids connector version conflicts.
 
@@ -219,9 +220,9 @@ In this project, spark.jars.packages was not configured in the code. Instead, th
 
 The code defines three parsing functions:
 
-- parse_user(): Parses u.user, using | as the delimiter.
-- parse_rating(): Parses u.data, using tab as the delimiter.
-- parse_movie(): Parses u.item, using | to separate the first 5 fields, with the following 19 columns being movie genre flag bits.
+- `parse_user()`: Parses u.user, using | as the delimiter.
+- `parse_rating()`: Parses u.data, using tab as the delimiter.
+- `parse_movie()`: Parses u.item, using | to separate the first 5 fields, with the following 19 columns being movie genre flag bits.
 
 It also defines three schemas corresponding to the three DataFrames. The files are then read from HDFS, RDDs are created and mapped to DataFrames, and dropna() is used for basic cleaning.
 
@@ -229,30 +230,24 @@ It also defines three schemas corresponding to the three DataFrames. The files a
 
 Using the Spark DataFrame API, group by movie_id and calculate the average rating. The result is joined with movies_df to obtain additional information such as movie titles. Finally, the result is written to the Cassandra table movie_average_ratings.
 
-<div align="center">
-    <img src="Putty%20screenshot/01_task1_3.png">
-</div>
-
 ## 4.4 Task 2: Identify Top Ten Movies by Average Rating
 
 Based on the Task 1 result, sort using orderBy(col("average_rating").desc()) in descending order, then limit(10) to select the top ten, and write to the Cassandra table top_ten_movies.
 
-<div align="center">
-    <img src="Putty%20screenshot/01_task1_3.png">
-</div>
 
 ## 4.5 Task 3: Find Active Users' Favourite Genre
 
 For users who have rated 50 or more movies (active users), transform the movie genre columns from wide format to long format (using the explode and array functions). Count the number of ratings per user per genre, then use the row_number() window function to identify each user's most-rated genre as their favourite genre. The result is written to the Cassandra table favourite_genres.
 
-<div align="center">
-    <img src="Putty%20screenshot/01_task1_3.png">
-</div>
+
 
 ## 4.6 Task 4: Users Under 20 Years Old & Task 5: Scientists Aged 30.40
 
 Tasks 4 and 5 are two relatively simple conditional filtering tasks. Task 4 filters users younger than 20 and writes them to users_under_20. Task 5 filters users whose occupation is scientist and whose age is between 30 and 40, and writes them to scientists_30_to_40.
 
+<div align="center">
+    <img src="Putty%20screenshot/01_task1_3.png">
+</div>
 <div align="center">
     <img src="Putty%20screenshot/02_task4_5.png">
 </div>
@@ -261,15 +256,16 @@ Tasks 4 and 5 are two relatively simple conditional filtering tasks. Task 4 filt
 
 After completing the Spark tasks, queries were executed against the five result tables in cqlsh to verify whether the data was written correctly:
 
-`sql
+```bash
 SELECT * FROM movielens_ks.movie_average_ratings LIMIT 10;
 SELECT * FROM movielens_ks.top_ten_movies LIMIT 10;
 SELECT * FROM movielens_ks.favourite_genres LIMIT 10;
 SELECT * FROM movielens_ks.users_under_20 LIMIT 10;
 SELECT * FROM movielens_ks.scientists_30_to_40 LIMIT 10;
-`
+```
 
 All five queries returned data from the corresponding Cassandra tables, and the screenshots are as follows:
+
 <div align="center">
 
 | Screenshot | Corresponding Cassandra Table |
@@ -318,21 +314,21 @@ Since the experimental environment uses Spark 2.3.0 (which belongs to the Scala 
 
 Solution 1: Specify a compatible connector version in the spark-submit command, while not duplicating the spark.jars.packages configuration in the code:
 
-`ash
+```bash
 spark-submit --packages com.datastax.spark:spark-cassandra-connector_2.11:2.5.2 assignment2.py
-`
+```
 
-`ash
+```bash
 # Comment out or remove this line in build_spark_session() to avoid duplicate configuration
 
 # .config("spark.jars.packages", "...")
-`
+```
 
 Solution 2: In Zeppelin . Spark . Properties, configure the following parameters:
-`ash
+```bash
 Key (name) : spark.jars.packages
 Value: com.datastax.spark:spark-cassandra-connector_2.11:2.4.3
-`
+```
 
 After configuration, click save to save it, then proceed in order: Interpreter . spark2 . Restart to restart the Spark2 interpreter.
 
