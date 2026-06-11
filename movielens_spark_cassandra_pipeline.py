@@ -85,7 +85,7 @@ def parse_rating(line):
 def parse_movie(line):
     # u.item is pipe-separated and movie title may contain spaces.
     parts = line.split("|")
-    # 构建 genre 标志列表（从索引5到23）
+    # Create genre flag list (from index 5 to 23)
     genre_flags = [int(value) for value in parts[5:24]]
     return (
         int(parts[0]),
