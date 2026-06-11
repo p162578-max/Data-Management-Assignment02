@@ -156,6 +156,7 @@ TRUNCATE scientists_30_to_40;
 - 三张原始数据表：users、ratings、movies（用于存储从 HDFS 加载的原始数据）。
 - 五张结果表：分别对应五个分析任务的输出。
 - 最后使用 TRUNCATE 清空所有表，确保每次运行 Spark 任务时都是干净的数据环境。
+- 使用''DESCRIBE KEYSPACES''
 
 ## 3.2 Spark代码实现
 
@@ -169,9 +170,9 @@ TRUNCATE scientists_30_to_40;
 
 ### 3.2.1 spark-submit 提交 Python 脚本
 
-首先，我进入虚拟机并确认 MovieLens 数据集文件在 HDFS 中的准确路径，包括 u.user、u.data 和 u.item。这些 HDFS 路径随后在 Python 脚本中用于加载原始数据。
+首先，我进入虚拟机并确认 MovieLens 数据集文件在 HDFS 中的准确路径 "hdfs:/user/maria_dev/ml-100k" ，包括 u.user、u.data 和 u.item。这些 HDFS 路径随后在 Python 脚本中用于加载原始数据。
 
-- "hdfs:/user/maria_dev/ml-100k"
+
 
 然后，在 PuTTY 中创建 Assignment2.py 文件并写入 PySpark 代码，具体的代码我放在了 movielens_spark_cassandra_pipeline.py 文件中。保存.py文件后，使用 spark-submit 提交：
 
@@ -197,7 +198,7 @@ SELECT * FROM movielens_ks.users_under_20 LIMIT 10;
 SELECT * FROM movielens_ks.scientists_30_to_40 LIMIT 10;
 ```
 
-### 3.2 方法二：Zeppelin Notebook 交互式执行
+### 3.2.2 方法二：Zeppelin Notebook 交互式执行
 
 除了 spark-submit 方式，我还尝试在 Apache Zeppelin 中运行相同的 PySpark 代码。Zeppelin 提供了一个交互式的 Web 界面，可以将代码分成多个段落（paragraph），逐段执行并即时查看输出。
 
@@ -239,9 +240,9 @@ Value: com.datastax.spark:spark-cassandra-connector_2.11:2.4.3
 Zeppelin 段落之间可以共享 SparkContext 和 SparkSession，因此前段创建好的 DataFrame 后段可以直接使用，大大提高了调试效率。
 
 
-## 5. Code Section Explanation
+# 4. Code Section Explanation
 
-### 5.1 Importing Libraries and Creating SparkSession
+## 4.1 Importing Libraries and Creating SparkSession
 
 代码首先导入所需的 PySpark 模块，包括 SparkSession、SQL 函数、数据类型和窗口函数。
 
@@ -254,9 +255,9 @@ SparkSession.builder \
     .getOrCreate()
 `
 
-在本项目中，spark.jars.packages 没有在代码中配置。相反，Cassandra 连接器在 spark-submit 命令中指定。这种方式对 Spark 2.3.0 更稳定，可以避免连接器版本冲突。
+- 注意：在本项目中，spark.jars.packages 没有在代码中配置。相反，Cassandra 连接器在 spark-submit 命令中指定。这种方式对 Spark 2.3.0 更稳定，可以避免连接器版本冲突。
 
-### 5.2 Parsing the Raw MovieLens Files
+## 5.2 Parsing the Raw MovieLens Files
 
 代码定义了三个解析函数：
 
