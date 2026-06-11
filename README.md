@@ -244,20 +244,36 @@ Zeppelin 段落之间可以共享 SparkContext 和 SparkSession，因此前段�
 
 ## 4.1 Importing Libraries and Creating SparkSession
 
-代码首先导入所需的 PySpark 模块，包括 SparkSession、SQL 函数、数据类型和窗口函数。
+- 代码首先导入所需的 PySpark 模块，包括 SparkSession、SQL 函数、数据类型和窗口函数。
 
-uild_spark_session() 函数用于创建 SparkSession，并配置 Cassandra 连接主机：
+  ```bash
+  from pyspark.sql import SparkSession
+  from pyspark.sql.functions import (
+    array,
+    avg,
+    col,
+    count,
+    explode,
+    lit,
+    row_number,
+    struct,
+  )
+  from pyspark.sql.types import IntegerType, StringType, StructField, StructType
+  from pyspark.sql.window import Window
+  ```
 
-`python
-SparkSession.builder \
-    .appName(APP_NAME) \
-    .config("spark.cassandra.connection.host", CASSANDRA_HOST) \
-    .getOrCreate()
-`
+- build_spark_session() 函数用于创建 SparkSession，并配置 Cassandra 连接主机：
+
+  ```bash
+  SparkSession.builder \
+      .appName(APP_NAME) \
+      .config("spark.cassandra.connection.host", CASSANDRA_HOST) \
+      .getOrCreate()
+  ```
 
 - 注意：在本项目中，spark.jars.packages 没有在代码中配置。相反，Cassandra 连接器在 spark-submit 命令中指定。这种方式对 Spark 2.3.0 更稳定，可以避免连接器版本冲突。
 
-## 5.2 Parsing the Raw MovieLens Files
+## 4.2 Parsing the Raw MovieLens Files
 
 代码定义了三个解析函数：
 
@@ -267,46 +283,54 @@ SparkSession.builder \
 
 同时定义了三个 Schema，分别对应三张 DataFrame。然后从 HDFS 中读取文件，创建 RDD 映射为 DataFrame，并使用 dropna() 进行基本清洗。
 
-### 5.3 Task 1: Calculating Average Rating for Each Movie
+## 4.3 5个分析任务的实现
+
+- Task 1: Calculating Average Rating for Each Movie
 
 使用 Spark DataFrame API 按 movie_id 分组，计算平均评分。将计算结果与 movies_df 关联，获取电影标题等额外信息。最终将结果写入 Cassandra 表 movie_average_ratings。
 
-### 5.4 Task 2: Identifying Top Ten Movies by Average Rating
+- Task 2: Identifying Top Ten Movies by Average Rating
 
 在任务 1 结果的基础上进行排序，使用 orderBy(col("average_rating").desc()) 降序排列，然后 limit(10) 选取前十部，写入 Cassandra 表 	op_ten_movies。
 
-### 5.5 Task 3: Identifying Active Users' Favourite Genre
+- Task 3: Identifying Active Users' Favourite Genre
 
 对于评分数量达到 50 部及以上的活跃用户，将电影类型列从宽表转换为长表（使用 explode 和 rray 函数）。计算每个用户在每个类型上的评分数量，最后使用 
 ow_number() 窗口函数选出每个用户评分最多的类型作为最爱类型。结果写入 Cassandra 表 avourite_genres。
 
-### 5.6 Task 4 and Task 5: Filtering Users by Age and Occupation
+- Task 4 and Task 5: Filtering Users by Age and Occupation
 
-任务 4 和 5 是两个相对简单的条件过滤任务。任务 4 筛选年龄小于 20 岁的用户，写入 users_under_20。任务 5 筛选职业为 scientist 且年龄在 30 到 40 岁之间的用户，写入 scientists_30_to_40。
+任务 4 和 5 是两个条件过滤任务。
+任务 4 筛选年龄小于 20 岁的用户，写入 users_under_20。
+任务 5 筛选职业为 scientist 且年龄在 30 到 40 岁之间的用户，写入 scientists_30_to_40。
 
-## 6. Results Analysis
+## 4.4. Results Analysis
 
-### 6.1 Task 1 Result: Average Rating per Movie
+- Task 1 Result: Average Rating per Movie
 
 任务 1 的计算结果表明，评分数量较少的电影容易获得极端评分（如 1.0 或 5.0），而热门电影的评分通常集中在 3 到 4 之间。在 Cassandra 中查询 movie_average_ratings 表中的前十条记录，结果与 Spark 输出完全一致，验证了数据写入的正确性。
 
-### 6.2 Task 2 Result: Top Ten Movies
+- Task 2 Result: Top Ten Movies
 
-排名前十的电影平均评分均为 5.0，但评分数量大多只有 1 到 3 条。例如 "Great Day in Harlem, A (1994)" 只有 1 条评分。这表明高评分可能源于样本量过小，需要结合 
-ating_count 字段谨慎解读排名结果。
+排名前十的电影平均评分均为 5.0，但评分数量大多只有 1 到 3 条。例如 "Great Day in Harlem, A (1994)" 只有 1 条评分。这表明高评分可能源于样本量过小，需要结合rating_count 字段谨慎解读排名结果。
 
-### 6.3 Task 3 Result: Favourite Movie Genre for Active Users
+- Task 3 Result: Favourite Movie Genre for Active Users
 
-任务 3 正确筛选出活跃用户并返回结果。输出中包含 
-ated_movie_count 和 genre_rating_count，表明活跃用户过滤和最爱类型计算均正确完成。
+任务 3 正确筛选出活跃用户并返回结果。输出中包含 rated_movie_count 和 genre_rating_count，表明活跃用户过滤和最爱类型计算均正确完成。
 
-### 6.4 Task 4 Result: Users Less Than 20 Years Old
+- Task 4 Result: Users Less Than 20 Years Old
 
-任务 4 成功输出了年龄小于 20 岁的用户。结果显示大部分 20 岁以下用户为学生，这符合该年龄段的实际情况。Cassandra 表 users_under_20 的前十条数据也成功返回，证明写入正确。
+任务 4 成功输出了年龄小于 20 岁的用户。结果显示大部分 20 岁以下用户为学生，这符合该年龄段的实际情况。
 
-### 6.5 Task 5 Result: Scientists Aged Between 30 and 40
+- Task 5 Result: Scientists Aged Between 30 and 40
 
-任务 5 成功应用了职业和年龄两个过滤条件。Cassandra 表 scientists_30_to_40 中的查询返回了匹配记录，确认第五个任务的数据已正确完成并存储。
+任务 5 成功应用了职业和年龄两个过滤条件。
+
+- 整体输出结果如截图所示
+
+![Task1-5 Result](Putty%20screenshot/01_task1_3.png)
+
+![Task1-5 Result](Putty%20screenshot/02_task4_5.png)
 
 ## 7. Cassandra Query Validation
 
@@ -330,8 +354,8 @@ SELECT * FROM movielens_ks.scientists_30_to_40 LIMIT 10;
 | 06_CqlshSelect04.png | users_under_20 |
 | 07_CqlshSelect05.png | scientists_30_to_40 |
 
-截图中的字段（movie_id、verage_rating、movie_title、
-ating_count、user_id、ge、occupation、avourite_genre 等）与 Spark 输出一致，证明结果已正确写入 Cassandra。
+截图中的字段（movie_id、average_rating、movie_title、
+ating_count、user_id、age、occupation、avourite_genre 等）与 Spark 输出一致，证明结果已正确写入 Cassandra。
 
 ## 8. Project Challenges
 
