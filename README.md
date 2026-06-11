@@ -37,71 +37,39 @@ The recommended environment is:
 
 A key compatibility issue in this project is the Spark Cassandra Connector version. Since Spark 2.3.0 belongs to the Scala 2.11 ecosystem, newer connector versions may not work correctly. Therefore, the connector package was specified in the spark-submit command:
 
-`ash
+```bash
 spark-submit --packages com.datastax.spark:spark-cassandra-connector_2.11:2.5.2 assignment2.py
-`
+```
 
 At the same time, the following configuration was not repeated inside the Python code:
 
-`python
+```python
 .config("spark.jars.packages", "...")
-`
+```
 
-In other words, this line was commented out or removed from uild_spark_session() to avoid dependency conflicts or repeated connector configuration.
+In other words, this line was commented out or removed from build_spark_session() to avoid dependency conflicts or repeated connector configuration.
 
 ## 3. Project Execution Workflow
 
-本项目采用了**两种方式**来实现五个任务分析，并将结果写入 Cassandra：
+### 3.1 Cassandra 数据库配置与建表
 
-1. **方法一：通过 spark-submit 提交 Python 脚本**——将 PySpark 代码写成一个独立的 .py 文件，使用命令行提交运行。
-2. **方法二：通过 Apache Zeppelin Notebook**——将代码分段落写入 Zeppelin 的交互式笔记本中，逐段执行并查看中间结果。
-
-两种方法的代码逻辑一致，但运行方式和调试体验不同。以下分别说明。
-
-### 3.1 方法一：spark-submit 提交 Python 脚本
-
-首先，我进入虚拟机并确认 MovieLens 数据集文件在 HDFS 中的准确路径，包括 u.user、u.data 和 u.item。这些 HDFS 路径随后在 Python 脚本中用于加载原始数据。
-
-接下来，我使用 PuTTY 连接虚拟机，激活 Cassandra，并进入 Cassandra 命令行界面 cqlsh。在 cqlsh 中创建名为 movielens_ks 的 keyspace，用于存放 Spark 程序生成的输出表。
-
-创建 keyspace 后，在 cqlsh 中执行 CQL 脚本创建所需的所有表格。然后，在 PuTTY 中创建 ssignment2.py 文件并写入 PySpark 代码。脚本完成后，使用 spark-submit 提交：
-
-`ash
-spark-submit --packages com.datastax.spark:spark-cassandra-connector_2.11:2.5.2 assignment2.py
-`
-
-程序运行成功后，Spark 完成五个分析任务，将结果 DataFrame 写入 Cassandra。最后，使用 cqlsh 验证数据是否正确写入。
-
-### 3.2 方法二：Zeppelin Notebook 交互式执行
-
-除了 spark-submit 方式，我还尝试在 Apache Zeppelin 中运行相同的 PySpark 代码。Zeppelin 提供了一个交互式的 Web 界面，可以将代码分成多个段落（paragraph），逐段执行并即时查看输出。
-
-Zeppelin Notebook 的段落结构如下：
-
-- **段落 1 — Imports & Configuration**：导入所需的 PySpark 模块，配置 HDFS 基础路径和 Cassandra keyspace，并定义 19 个电影类型列。
-- **段落 2 — Parse Functions & Schemas**：定义 parse_user()、parse_rating()、parse_movie() 三个解析函数以及对应的 Schema 结构。
-- **段落 3 — Load Raw Data from HDFS**：从 HDFS 读取数据集，创建 RDD 并转换为 DataFrame，同时进行去空值清洗。
-- **段落 4 — Task 1: Average Rating per Movie**：计算每部电影的平均评分。
-- **段落 5 — Task 2: Top Ten Movies**：按平均评分排序，选出前十部电影。
-- **段落 6 — Task 3: Favourite Genre (Users with ≥ 50 Ratings)**：找到评分数量不少于 50 部的活跃用户，并确定他们最喜欢的电影类型。
-- **段落 7 — Task 4: Users Under 20 Years Old**：筛选年龄小于 20 岁的用户。
-- **段落 8 — Task 5: Scientists Aged 30–40**：筛选职业为 scientist 且年龄在 30 到 40 岁之间的用户。
-- **段落 9 — Write Results to Cassandra**：将五个任务的 DataFrame 写入对应的 Cassandra 表。
-- **段落 10 — Verify in Cassandra**：从 Cassandra 表中读取数据，验证写入是否正确。
-
-Zeppelin 段落之间可以共享 SparkContext 和 SparkSession，因此前段创建好的 DataFrame 后段可以直接使用，大大提高了调试效率。
-
-## 4. Cassandra 数据库配置与建表
-
-### 4.1 Cassandra 激活与状态查询
+#### 3.1.1 Cassandra 激活与状态查询
 
 在运行 Spark 任务之前，需要先确保 Cassandra 数据库已正常启动。具体步骤如下：
 
 1. 通过 PuTTY 连接虚拟机，在终端中激活 Cassandra 服务。
-2. 使用 
-odetool status 命令检查 Cassandra 节点状态，确认节点状态为 "UN"（Up/Normal），表示节点正常运行。
+2. 使用命令检查 Cassandra 激活状态
 
-![Cassandra 激活与状态查询](00_CassandraActivation&StatusCheck.png)
+```bash
+# 查看 Cassandra 服务状态
+sudo systemctl status cassandra
+
+# 如果未运行，启动 Cassandra 服务
+sudo systemctl start cassandra
+```
+
+
+![Cassandra 激活与状态查询](Puttysreenshot/00_CassandraActivation&StatusCheck.png)
 
 ### 4.2 CQL 建表脚本
 
@@ -187,9 +155,76 @@ TRUNCATE scientists_30_to_40;
 `
 
 此脚本创建了：
-- 三张原始数据表：users、atings、movies（用于存储从 HDFS 加载的原始数据）。
+- 三张原始数据表：users、
+atings、movies（用于存储从 HDFS 加载的原始数据）。
 - 五张结果表：分别对应五个分析任务的输出。
 - 最后使用 TRUNCATE 清空所有表，确保每次运行 Spark 任务时都是干净的数据环境。
+
+本项目采用了**两种方式**来实现五个任务分析，并将结果写入 Cassandra：
+
+**方法一：通过 spark-submit 提交 Python 脚本**——将 PySpark 代码写成一个独立的 .py 文件，使用命令行提交运行。
+
+**方法二：通过 Apache Zeppelin Notebook**——将代码分段落写入 Zeppelin 的交互式笔记本中，逐段执行并查看中间结果。
+
+两种方法的代码逻辑一致，但运行方式和调试体验不同。但是不管哪种方法都必须先要在Cassandra中建立好keyspace，用于存储相应的分析表格
+
+### 3.1 方法一：spark-submit 提交 Python 脚本
+
+首先，我进入虚拟机并确认 MovieLens 数据集文件在 HDFS 中的准确路径，包括 u.user、u.data 和 u.item。这些 HDFS 路径随后在 Python 脚本中用于加载原始数据。
+
+
+"hdfs:/user/maria_dev/ml-100k"
+
+
+接下来，我使用 PuTTY 连接虚拟机，激活 Cassandra，并进入 Cassandra 命令行界面 cqlsh。在 cqlsh 中创建名为 movielens_ks 的 keyspace，用于存放 Spark 程序生成的输出表。
+
+创建 keyspace 后，在 cqlsh 中执行 CQL 脚本创建所需的所有表格。然后，在 PuTTY 中创建 Assignment2.py 文件并写入 PySpark 代码。脚本完成后，使用 spark-submit 提交：
+
+```bash
+spark-submit --packages com.datastax.spark:spark-cassandra-connector_2.11:2.5.2 assignment2.py
+```
+
+注意: 因为我把py文件中的.config("spark.jars.packages", "...")语句注释掉了，在spark-submit中手动附加spark.jars.packages的指令，可以避免版本冲突，增加兼容。
+
+程序运行成功后，Spark 完成五个分析任务，将结果 DataFrame 写入 Cassandra。最后，使用 cqlsh 查询语句验证数据是否正确写入。
+
+### 3.2 方法二：Zeppelin Notebook 交互式执行
+
+除了 spark-submit 方式，我还尝试在 Apache Zeppelin 中运行相同的 PySpark 代码。Zeppelin 提供了一个交互式的 Web 界面，可以将代码分成多个段落（paragraph），逐段执行并即时查看输出。
+
+Zeppelin Notebook 的段落结构如下：
+
+```bash
+Zeppelin 版本太老（HDP 0.7.x / Spark2），需要用"手动配置jar"
+在 Zeppelin → Spark → Properties 里配置如下参数：
+Key (name) : spark.jars.packages
+Value: com.datastax.spark:spark-cassandra-connector_2.11:2.4.3
+配置完成后点击save保存
+依次操作：Interpreter → spark2 → Restart 重启Spark2解释器
+```
+
+- **段落 1 — Imports & Configuration**：导入所需的 PySpark 模块，配置 HDFS 基础路径和 Cassandra keyspace，并定义 19 个电影类型列。
+  
+- **段落 2 — Parse Functions & Schemas**：定义 parse_user()、parse_rating()、parse_movie() 三个解析函数以及对应的 Schema 结构。
+  
+- **段落 3 — Load Raw Data from HDFS**：从 HDFS 读取数据集，创建 RDD 并转换为 DataFrame，同时进行去空值清洗。
+  
+- **段落 4 — Task 1: Average Rating per Movie**：计算每部电影的平均评分。
+  
+- **段落 5 — Task 2: Top Ten Movies**：按平均评分排序，选出前十部电影。
+  
+- **段落 6 — Task 3: Favourite Genre (Users with ≥ 50 Ratings)**：找到评分数量不少于 50 部的活跃用户，并确定他们最喜欢的电影类型。
+  
+- **段落 7 — Task 4: Users Under 20 Years Old**：筛选年龄小于 20 岁的用户。
+  
+- **段落 8 — Task 5: Scientists Aged 30–40**：筛选职业为 scientist 且年龄在 30 到 40 岁之间的用户。
+  
+- **段落 9 — Write Results to Cassandra**：将五个任务的 DataFrame 写入对应的 Cassandra 表
+  
+- **段落 10 — Verify in Cassandra**：从 Cassandra 表中读取数据，验证写入是否正确。
+
+Zeppelin 段落之间可以共享 SparkContext 和 SparkSession，因此前段创建好的 DataFrame 后段可以直接使用，大大提高了调试效率。
+
 
 ## 5. Code Section Explanation
 
@@ -228,7 +263,8 @@ SparkSession.builder \
 
 ### 5.5 Task 3: Identifying Active Users' Favourite Genre
 
-对于评分数量达到 50 部及以上的活跃用户，将电影类型列从宽表转换为长表（使用 explode 和 rray 函数）。计算每个用户在每个类型上的评分数量，最后使用 ow_number() 窗口函数选出每个用户评分最多的类型作为最爱类型。结果写入 Cassandra 表 avourite_genres。
+对于评分数量达到 50 部及以上的活跃用户，将电影类型列从宽表转换为长表（使用 explode 和 rray 函数）。计算每个用户在每个类型上的评分数量，最后使用 
+ow_number() 窗口函数选出每个用户评分最多的类型作为最爱类型。结果写入 Cassandra 表 avourite_genres。
 
 ### 5.6 Task 4 and Task 5: Filtering Users by Age and Occupation
 
@@ -242,11 +278,13 @@ SparkSession.builder \
 
 ### 6.2 Task 2 Result: Top Ten Movies
 
-排名前十的电影平均评分均为 5.0，但评分数量大多只有 1 到 3 条。例如 "Great Day in Harlem, A (1994)" 只有 1 条评分。这表明高评分可能源于样本量过小，需要结合 ating_count 字段谨慎解读排名结果。
+排名前十的电影平均评分均为 5.0，但评分数量大多只有 1 到 3 条。例如 "Great Day in Harlem, A (1994)" 只有 1 条评分。这表明高评分可能源于样本量过小，需要结合 
+ating_count 字段谨慎解读排名结果。
 
 ### 6.3 Task 3 Result: Favourite Movie Genre for Active Users
 
-任务 3 正确筛选出活跃用户并返回结果。输出中包含 ated_movie_count 和 genre_rating_count，表明活跃用户过滤和最爱类型计算均正确完成。
+任务 3 正确筛选出活跃用户并返回结果。输出中包含 
+ated_movie_count 和 genre_rating_count，表明活跃用户过滤和最爱类型计算均正确完成。
 
 ### 6.4 Task 4 Result: Users Less Than 20 Years Old
 
@@ -278,7 +316,8 @@ SELECT * FROM movielens_ks.scientists_30_to_40 LIMIT 10;
 | 06_CqlshSelect04.png | users_under_20 |
 | 07_CqlshSelect05.png | scientists_30_to_40 |
 
-截图中的字段（movie_id、verage_rating、movie_title、ating_count、user_id、ge、occupation、avourite_genre 等）与 Spark 输出一致，证明结果已正确写入 Cassandra。
+截图中的字段（movie_id、verage_rating、movie_title、
+ating_count、user_id、ge、occupation、avourite_genre 等）与 Spark 输出一致，证明结果已正确写入 Cassandra。
 
 ## 8. Project Challenges
 
