@@ -186,6 +186,19 @@ In addition to the spark-submit approach, I also attempted to run the same PySpa
 
 The paragraph structure of the Zeppelin Notebook is as follows:
 
+```bash
+# Zeppelin version is too old (HDP 0.7.x / Spark2), need to "configure jars manually"
+
+In Zeppelin → Spark → Properties, configure the following parameters:
+
+Key (name): spark.jars.packages
+Value: com.datastax.spark:spark-cassandra-connector_2.11:2.4.3
+
+Click Save after configuration
+
+Sequence of operations: Interpreter → spark2 → Restart to restart the Spark2 interpreter
+```
+
 - Paragraph 1 — Imports & Configuration: Import the required PySpark modules, configure the HDFS base path and Cassandra keyspace, and define the 19 movie genre columns.
 - Paragraph 2 — Parse Functions & Schemas: Define the three parsing functions — parse_user(), parse_rating(), parse_movie() — and the corresponding schema structures.
 - Paragraph 3 — Load Raw Data from HDFS: Read the dataset from HDFS, create RDDs, convert them to DataFrames, and perform null value cleaning.
