@@ -4,9 +4,9 @@
 
 This project builds a data processing and analytics pipeline using the MovieLens 100K dataset with Python, Apache Spark, HDFS, and Cassandra. The main dataset files used in this project are:
 
-- u.user: user information, including user ID, age, gender, occupation, and ZIP code.
-- u.data: rating information, including user ID, movie ID, rating, and timestamp.
-- u.item: movie information, including movie ID, movie title, release date, IMDb URL, and genre indicators.
+- `u.user`: user information, including user ID, age, gender, occupation, and ZIP code.
+- `u.data`: rating information, including user ID, movie ID, rating, and timestamp.
+- `u.item`: movie information, including movie ID, movie title, release date, IMDb URL, and genre indicators.
 
 The objective of this project is to read raw MovieLens data from HDFS into Spark, create RDDs, convert them into DataFrames, perform cleaning and analytical queries, and write the results into Cassandra tables. The final results are then verified in cqlsh by selecting records from the Cassandra tables.
 
@@ -47,7 +47,7 @@ spark-submit --packages com.datastax.spark:spark-cassandra-connector_2.11:2.5.2 
 
 At the same time, the following configuration was not repeated inside the Python code:
 
-```python
+```bash
 .config("spark.jars.packages", "...")
 ```
 
