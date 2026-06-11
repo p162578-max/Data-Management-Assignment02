@@ -490,6 +490,10 @@ SELECT * FROM movielens_ks.scientists_30_to_40 LIMIT 10;
 另一种代码逻辑，核心是每个单元格的%spark2.pyspark载入，其他代码跟movielens_spark_cassandra_pipeline.py文件中的主体代码是类似的，运行环境从puTTY终端转移到了zeppelin notebook上，我把代码按照单元格分别依次运行，保存为json文件，在该项目的Assignment02json文件中，可以直接导入zeppelin中运行，注意手动配置jars。部分结果截图：
 
 <div align="center">
+    <img src="Zeppelin%20screenshot/10_Write%20to%20Cassandra.png">
+</div>
+
+<div align="center">
     <img src="Zeppelin%20screenshot/12_Verify%20Result1.png">
 </div>
 
@@ -529,7 +533,7 @@ Value: com.datastax.spark:spark-cassandra-connector_2.11:2.4.3
 
 第二个挑战是 u.item 文件中电影类型的存储结构。19 种电影类型以独立的列存储（每列 0 或 1），这种宽表格式不利于统计用户在各类型上的评分数量。
 
-**解决方案**：使用 Spark 的 rray 和 explode 函数，将宽表转为长表后再与评分数据做关联计算，从而正确统计每个用户在每个类型上的评分数量，并找出最爱类型。
+**解决方案**：使用 Spark 的 array 和 explode 函数，将宽表转为长表后再与评分数据做关联计算，从而正确统计每个用户在每个类型上的评分数量，并找出最爱类型。
 
 
 ## 7.3 Cassandra 查询结果排序问题
