@@ -61,21 +61,20 @@ In other words, this line was commented out or removed from build_spark_session(
 2. 使用命令检查 Cassandra 激活状态
 
 ```bash
-# 查看 Cassandra 服务状态
-sudo systemctl status cassandra
+# 启动Cassandra服务
+sudo service cassandra start
 
-# 如果未运行，启动 Cassandra 服务
-sudo systemctl start cassandra
+# 查看Cassandra服务运行状态
+service cassandra status
 ```
 
+![Cassandra 激活与状态查询](Putty%20screenshot/00_CassandraActivation%26StatusCheck.png)
 
-![Cassandra 激活与状态查询](Puttysreenshot/00_CassandraActivation&StatusCheck.png)
-
-### 4.2 CQL 建表脚本
+### 3.1.2 CQL 建表脚本
 
 Cassandra 正常运行后，进入 cqlsh 命令行界面，执行以下 CQL 脚本创建 keyspace 和所有需要的表：
 
-`sql
+```bash
 CREATE KEYSPACE IF NOT EXISTS movielens_ks
 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
 
@@ -152,14 +151,13 @@ TRUNCATE top_ten_movies;
 TRUNCATE favourite_genres;
 TRUNCATE users_under_20;
 TRUNCATE scientists_30_to_40;
-`
-
+```
 此脚本创建了：
-- 三张原始数据表：users、
-atings、movies（用于存储从 HDFS 加载的原始数据）。
+- 三张原始数据表：users、ratings、movies（用于存储从 HDFS 加载的原始数据）。
 - 五张结果表：分别对应五个分析任务的输出。
 - 最后使用 TRUNCATE 清空所有表，确保每次运行 Spark 任务时都是干净的数据环境。
 
+## 3.2
 本项目采用了**两种方式**来实现五个任务分析，并将结果写入 Cassandra：
 
 **方法一：通过 spark-submit 提交 Python 脚本**——将 PySpark 代码写成一个独立的 .py 文件，使用命令行提交运行。
