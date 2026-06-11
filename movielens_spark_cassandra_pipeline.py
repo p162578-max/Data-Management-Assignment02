@@ -54,7 +54,7 @@ def build_spark_session():
     return (
         SparkSession.builder.appName(APP_NAME)
         .config("spark.cassandra.connection.host", CASSANDRA_HOST)
-        .config("spark.jars.packages", "com.datastax.spark:spark-cassandra-connector_2.11:2.5.2")
+       #.config("spark.jars.packages", "com.datastax.spark:spark-cassandra-connector_2.11:2.5.2")
         .getOrCreate()
     )
 
