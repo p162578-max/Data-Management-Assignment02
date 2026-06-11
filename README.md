@@ -1,4 +1,4 @@
-# MovieLens 100K Spark and Cassandra Data Management Project Description
+# Project Description
 
 ## 1. Project Overview
 
