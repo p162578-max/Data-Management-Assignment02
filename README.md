@@ -491,6 +491,9 @@ SELECT * FROM movielens_ks.scientists_30_to_40 LIMIT 10;
 
 <div align="center">
     <img src="Zeppelin%20screenshot/12_Verify%20Result1.png">
+</div>
+
+<div align="center">
     <img src="Zeppelin%20screenshot/13_Verify%20Result2.png">
 </div>
 
