@@ -309,7 +309,11 @@ ow_number() 窗口函数选出每个用户评分最多的类型作为最爱类�
 任务 4 筛选年龄小于 20 岁的用户，写入 users_under_20。
 任务 5 筛选职业为 scientist 且年龄在 30 到 40 岁之间的用户，写入 scientists_30_to_40。
 
-## 4.4. Results Analysis
+## 4.4 写入Cassandra
+
+
+
+## 4.5 Results Analysis
 
 - Task 1 Result: Average Rating per Movie
 
