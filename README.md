@@ -1,6 +1,6 @@
 ﻿<h1 align='center'>Project Description</h1>
 
-## 1. Project Overview
+# 1. Project Overview
 
 This project builds a data processing and analytics pipeline using the MovieLens 100K dataset with Python, Apache Spark, HDFS, and Cassandra. The main dataset files used in this project are:
 
@@ -18,7 +18,7 @@ The five analytical tasks completed in this project are:
 4. Find all users who are less than 20 years old.
 5. Find all users whose occupation is scientist and whose age is between 30 and 40 years old.
 
-## 2. Environment Requirements
+# 2. Environment Requirements
 
 This project was executed in a virtual machine environment using HDFS, Apache Spark, Cassandra, and Python. Since the course environment uses an older Spark version, Cassandra connector compatibility is an important requirement.
 
@@ -49,11 +49,11 @@ At the same time, the following configuration was not repeated inside the Python
 
 In other words, this line was commented out or removed from build_spark_session() to avoid dependency conflicts or repeated connector configuration.
 
-## 3. Project Execution Workflow
+# 3. Project Execution Workflow
 
-### 3.1 Cassandra 数据库配置与建表
+## 3.1 Cassandra 数据库配置与建表
 
-#### 3.1.1 Cassandra 激活与状态查询
+### 3.1.1 Cassandra 激活与状态查询
 
 在运行 Spark 任务之前，需要先确保 Cassandra 数据库已正常启动。具体步骤如下：
 
@@ -157,7 +157,8 @@ TRUNCATE scientists_30_to_40;
 - 五张结果表：分别对应五个分析任务的输出。
 - 最后使用 TRUNCATE 清空所有表，确保每次运行 Spark 任务时都是干净的数据环境。
 
-## 3.2
+## 3.2 Spark代码实现
+
 本项目采用了**两种方式**来实现五个任务分析，并将结果写入 Cassandra：
 
 **方法一：通过 spark-submit 提交 Python 脚本**——将 PySpark 代码写成一个独立的 .py 文件，使用命令行提交运行。
@@ -166,17 +167,13 @@ TRUNCATE scientists_30_to_40;
 
 两种方法的代码逻辑一致，但运行方式和调试体验不同。但是不管哪种方法都必须先要在Cassandra中建立好keyspace，用于存储相应的分析表格
 
-### 3.1 方法一：spark-submit 提交 Python 脚本
+### 3.2.1 spark-submit 提交 Python 脚本
 
 首先，我进入虚拟机并确认 MovieLens 数据集文件在 HDFS 中的准确路径，包括 u.user、u.data 和 u.item。这些 HDFS 路径随后在 Python 脚本中用于加载原始数据。
 
+- "hdfs:/user/maria_dev/ml-100k"
 
-"hdfs:/user/maria_dev/ml-100k"
-
-
-接下来，我使用 PuTTY 连接虚拟机，激活 Cassandra，并进入 Cassandra 命令行界面 cqlsh。在 cqlsh 中创建名为 movielens_ks 的 keyspace，用于存放 Spark 程序生成的输出表。
-
-创建 keyspace 后，在 cqlsh 中执行 CQL 脚本创建所需的所有表格。然后，在 PuTTY 中创建 Assignment2.py 文件并写入 PySpark 代码。脚本完成后，使用 spark-submit 提交：
+然后，在 PuTTY 中创建 Assignment2.py 文件并写入 PySpark 代码，具体的代码我放在了 movielens_spark_cassandra_pipeline.py 文件中。保存.py文件后，使用 spark-submit 提交：
 
 ```bash
 spark-submit --packages com.datastax.spark:spark-cassandra-connector_2.11:2.5.2 assignment2.py
@@ -184,7 +181,21 @@ spark-submit --packages com.datastax.spark:spark-cassandra-connector_2.11:2.5.2 
 
 注意: 因为我把py文件中的.config("spark.jars.packages", "...")语句注释掉了，在spark-submit中手动附加spark.jars.packages的指令，可以避免版本冲突，增加兼容。
 
-程序运行成功后，Spark 完成五个分析任务，将结果 DataFrame 写入 Cassandra。最后，使用 cqlsh 查询语句验证数据是否正确写入。
+程序运行成功后，Spark 完成五个分析任务，将结果 DataFrame 写入 Cassandra。最后，使用 cqlsh 查询语句验证数据是否正确写入
+
+```bash
+# 验证：查看所有 keyspace
+DESCRIBE KEYSPACES;
+
+# 切换到 movielens_ks 并列出其中的表
+USE movielens_ks;
+
+SELECT * FROM movielens_ks.movie_average_ratings LIMIT 10;
+SELECT * FROM movielens_ks.top_ten_movies LIMIT 10;
+SELECT * FROM movielens_ks.favourite_genres LIMIT 10;
+SELECT * FROM movielens_ks.users_under_20 LIMIT 10;
+SELECT * FROM movielens_ks.scientists_30_to_40 LIMIT 10;
+```
 
 ### 3.2 方法二：Zeppelin Notebook 交互式执行
 
@@ -193,11 +204,15 @@ spark-submit --packages com.datastax.spark:spark-cassandra-connector_2.11:2.5.2 
 Zeppelin Notebook 的段落结构如下：
 
 ```bash
-Zeppelin 版本太老（HDP 0.7.x / Spark2），需要用"手动配置jar"
+# Zeppelin 版本太老（HDP 0.7.x / Spark2），需要用"手动配置jar"
+
 在 Zeppelin → Spark → Properties 里配置如下参数：
+
 Key (name) : spark.jars.packages
 Value: com.datastax.spark:spark-cassandra-connector_2.11:2.4.3
+
 配置完成后点击save保存
+
 依次操作：Interpreter → spark2 → Restart 重启Spark2解释器
 ```
 
