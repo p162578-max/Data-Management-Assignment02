@@ -24,6 +24,8 @@ This project was executed in a virtual machine environment using HDFS, Apache Sp
 
 The recommended environment is:
 
+<div align="center">
+    
 | Component | Description |
 |---|---|
 | Operating environment | Linux virtual machine |
@@ -34,6 +36,8 @@ The recommended environment is:
 | Remote access tool | PuTTY |
 | Interactive notebook | Apache Zeppelin |
 | Dataset | MovieLens 100K |
+    
+</div>
 
 A key compatibility issue in this project is the Spark Cassandra Connector version. Since Spark 2.3.0 belongs to the Scala 2.11 ecosystem, newer connector versions may not work correctly. Therefore, the connector package was specified in the spark-submit command:
 
@@ -67,8 +71,9 @@ sudo service cassandra start
 # 查看Cassandra服务运行状态
 service cassandra status
 ```
-
-![Cassandra 激活与状态查询](Putty%20screenshot/00_CassandraActivation%26StatusCheck.png)
+<div align="center">
+    <img src="Putty%20screenshot/00_CassandraActivation%26StatusCheck.png">
+</div>
 
 ### 3.1.2 CQL 建表脚本
 
@@ -328,85 +333,99 @@ ow_number() 窗口函数选出每个用户评分最多的类型作为最爱类�
 
 - 整体输出结果如截图所示
 
-![Task1-5 Result](Putty%20screenshot/01_task1_3.png)
+<div align="center">
+    <img src="Putty%20screenshot/01_task1_3.png">
+</div>
 
-![Task1-5 Result](Putty%20screenshot/02_task4_5.png)
+<div align="center">
+    <img src="Putty%20screenshot/02_task4_5.png">
+</div>
 
-## 7. Cassandra Query Validation
+## 5. Cassandra Query Validation
 
 完成 Spark 任务后，在 cqlsh 中针对五张结果表执行查询，验证数据是否正确写入：
 
-`sql
+```
 SELECT * FROM movielens_ks.movie_average_ratings LIMIT 10;
 SELECT * FROM movielens_ks.top_ten_movies LIMIT 10;
 SELECT * FROM movielens_ks.favourite_genres LIMIT 10;
 SELECT * FROM movielens_ks.users_under_20 LIMIT 10;
 SELECT * FROM movielens_ks.scientists_30_to_40 LIMIT 10;
-`
+```
 
 所有五条查询均从对应 Cassandra 表中返回了数据，截图如下：
+<div align="center">
 
 | 截图 | 对应 Cassandra 表 |
 |---|---|
 | 03_CqlshSelect01.png | movie_average_ratings |
-| 04_CqlshSelect02.png | 	op_ten_movies |
+| 04_CqlshSelect02.png | 	top_ten_movies |
 | 05_CqlshSelect03.png | avourite_genres |
 | 06_CqlshSelect04.png | users_under_20 |
 | 07_CqlshSelect05.png | scientists_30_to_40 |
 
-截图中的字段（movie_id、average_rating、movie_title、
-ating_count、user_id、age、occupation、avourite_genre 等）与 Spark 输出一致，证明结果已正确写入 Cassandra。
+</div>
 
-## 8. Project Challenges
+<div align="center">
+    <img src="Putty%20screenshot/03_CqlshSelect01.png">
+    <img src="Putty%20screenshot/04_CqlshSelect02.png">
+    <img src="Putty%20screenshot/05_CqlshSelect03.png">
+    <img src="Putty%20screenshot/06_CqlshSelect04.png">
+    <img src="Putty%20screenshot/07_CqlshSelect05.png">
+</div>
 
-### 8.1 Spark 与 Cassandra 连接器版本兼容性问题
+截图中的字段（movie_id、average_rating、movie_title、rating_count、user_id、age、occupation、avourite_genre 等）与 Spark 输出一致，证明结果已正确写入 Cassandra。
+
+
+# 6. Project Challenges
+
+## 6.1 Spark 与 Cassandra 连接器版本兼容性问题
 
 本项目的第一个主要挑战是 Apache Spark 与 Spark Cassandra Connector 之间的版本兼容性。
 
 由于实验环境使用的是 Spark 2.3.0（属于 Scala 2.11 生态），较新版本的 Spark Cassandra Connector 可能不兼容。新版本连接器可能依赖于不同的 Scala 或 Spark 版本，导致包下载错误、类加载错误或连接器初始化失败。
 
-**解决方案**：在 spark-submit 命令中指定兼容的连接器版本，同时在代码中不重复配置 spark.jars.packages：
+解决方案1：在 spark-submit 命令中指定兼容的连接器版本，同时在代码中不重复配置 spark.jars.packages：
 
-`ash
+```bash
 spark-submit --packages com.datastax.spark:spark-cassandra-connector_2.11:2.5.2 assignment2.py
-`
+```
 
-`python
+```bash
 # build_spark_session() 中注释掉或移除此行，避免重复配置
-# .config("spark.jars.packages", "...")
-`
 
-### 8.2 电影类型数据结构处理
+# .config("spark.jars.packages", "...")
+```
+
+解决方案2：在 Zeppelin → Spark → Properties 里配置如下参数：
+```bash
+Key (name) : spark.jars.packages
+Value: com.datastax.spark:spark-cassandra-connector_2.11:2.4.3
+```
+
+配置完成后点击save保存，依次操作：Interpreter → spark2 → Restart 重启Spark2解释器
+
+## 6.2 电影类型数据结构处理
 
 第二个挑战是 u.item 文件中电影类型的存储结构。19 种电影类型以独立的列存储（每列 0 或 1），这种宽表格式不利于统计用户在各类型上的评分数量。
 
 **解决方案**：使用 Spark 的 rray 和 explode 函数，将宽表转为长表后再与评分数据做关联计算，从而正确统计每个用户在每个类型上的评分数量，并找出最爱类型。
 
-### 8.3 Zeppelin Notebook 的导入与使用
 
-第三个挑战是在 Zeppelin 中导入和运行 Notebook。由于 Zeppelin 的 JSON 文件格式较为复杂，直接在 Web 界面中逐段编写代码效率较低。
-
-**解决方案**：我从 Zeppelin 导出了一个 .json 文件，在本地编辑器中完成了代码编写和注释添加，然后通过 Zeppelin 的导入功能将整个 Notebook 重新加载。关键在于：
-
-1. 先在 Zeppelin 中创建一个空白 Note，导出一个模板 JSON。
-2. 在本地编辑器中按模板结构添加段落（paragraphs），包括 PySpark 代码和详细的中文注释。
-3. 通过 Zeppelin Web UI 的 "Import Note" 功能将修改后的 JSON 重新导入。
-4. 导入后在 Zeppelin 中逐段运行调试，确保所有段落按顺序正确执行。
-
-这种方式将代码编写与执行环境分离，本地编辑更高效，同时保留了 Zeppelin 交互式执行的优势。最终生成的 Zeppelin Notebook JSON 文件（Assignment02.json）包含了完整的代码和注释，可以直接导入并运行。
-
-### 8.4 Cassandra 查询结果排序问题
+## 6.3 Cassandra 查询结果排序问题
 
 最后一个挑战是 Cassandra 查询结果的排序。Cassandra 是分布式数据库，SELECT 查询返回的结果不一定按照 Spark 输出的顺序排列。因此，在 cqlsh 中使用 LIMIT 10 主要用于验证数据存在性和表结构字段的正确性。对于基于排序的分析结果，以 Spark 的输出为准更合适。
 
 ## 9. Conclusion
 
-本项目成功使用 Spark 和 Cassandra 实现了完整的 MovieLens 100K 数据分析管道。原始数据从 HDFS 加载，经 RDD 解析后转为 DataFrame，完成清洗、分析和 Cassandra 写入。
+本项目成功使用 Spark 和 Cassandra 实现了完整的 MovieLens 100K 数据分析管道。原始数据从 HDFS 加载，经 RDD 解析后转为 DataFrame，完成清洗、分析和 Cassandra 写入。本次项目涵盖了 HDFS 数据加载、RDD 创建、DataFrame 转换、Spark SQL 分析、Cassandra 写入和结果验证的完整数据处理工作流。
 
 项目采用两种方式实现：
+
 - **方法一（spark-submit）**：将 PySpark 代码写成独立脚本，通过命令行提交，适合生产环境批量执行。
-- **方法二（Zeppelin Notebook）**：在交互式 Web 界面中逐段执行，方便调试和查看中间结果，适合开发和教学场景。
+  
+- **方法二（Zeppelin Notebook）**：在交互式 Web 界面中逐段执行，方便调试和查看中间结果，适合开发场景。
 
-结果显示，平均评分最高的电影往往只有极少数评分，因此在解读排名时需谨慎。对于活跃用户，Drama 和 Action 等类型常作为最喜爱类型出现。20 岁以下用户以学生为主，职业为 scientist 且年龄在 30 到 40 岁之间的用户被成功识别。
+结果显示，平均评分最高的电影往往只有极少数评分，因此在解读排名时需谨慎。对于活跃用户，Drama 和 Action 等类型常作为最喜爱类型出现。20 岁以下用户以学生为主，职业为 scientist 且年龄在 30 到 40 岁之间的用户被成功识别。五个分析结果均通过两种方式正确写入 Cassandra，并在 cqlsh 中完成验证。
 
-五个分析结果均通过两种方式正确写入 Cassandra，并在 cqlsh 中完成验证。本次项目涵盖了 HDFS 数据加载、RDD 创建、DataFrame 转换、Spark SQL 分析、Cassandra 写入和结果验证的完整数据处理工作流。
+
